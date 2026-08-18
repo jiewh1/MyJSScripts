@@ -1,0 +1,292 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/4.0.0/jquery.min.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT Subtitle Generator</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #subtitleText {
+            height: 180px;
+        }
+
+        #output {
+            height: 300px;
+            margin-top: 10px;
+        }
+
+        .buttons {
+            margin: 15px 0;
+        }
+
+        button {
+            padding: 10px 16px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        #timer {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0078d4;
+            margin: 15px 0;
+        }
+
+        #currentLine {
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+            font-size: 20px;
+            min-height: 30px;
+        }
+
+        .status {
+            color: #666;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>SRT Subtitle Generator</h2>
+
+    <p>Enter one subtitle per line:</p>
+
+    <textarea id="subtitleText" placeholder="Hello everyone.
+Welcome to the training.
+Let's get started."></textarea>
+
+    <div class="buttons">
+        <button id="btnStart">Start Timer</button>
+        <button id="btnRecord" disabled>Set Start Time</button>
+        <button id="btnPause" disabled>Pause</button>
+        <button id="btnReset">Reset</button>
+    </div>
+
+    <div id="timer">00:00:00,000</div>
+
+    <div class="status">
+        Current Subtitle:
+    </div>
+
+    <div id="currentLine">
+        Not started
+    </div>
+
+    <h3>SRT Output</h3>
+
+    <textarea id="output" readonly></textarea>
+
+</body>
+</html>
+
+<script>
+    let lines = [];
+    let currentIndex = 0;
+
+    let startTime = null;
+    let timerInterval = null;
+
+    let timerStarted = false;
+    let isPaused = false;
+
+    let pauseStartedAt = 0;
+    let totalPausedTime = 0;
+
+    let waitingForEnd = false;
+    let subtitleStart = null;
+
+    let srtEntries = [];
+
+    function formatSrtTime(ms) {
+        let hours = Math.floor(ms / 3600000);
+        ms %= 3600000;
+        let minutes = Math.floor(ms / 60000);
+        ms %= 60000;
+        let seconds = Math.floor(ms / 1000);
+        let milliseconds = ms % 1000;
+
+        return (
+            String(hours).padStart(2, '0') + ':' +
+            String(minutes).padStart(2, '0') + ':' +
+            String(seconds).padStart(2, '0') + ',' +
+            String(milliseconds).padStart(3, '0')
+        );
+    }
+
+    function getCurrentElapsed() {
+        if (!startTime) {
+            return 0;
+        }
+        if (isPaused) {
+            return pauseStartedAt - startTime - totalPausedTime;
+        }
+        return Date.now() - startTime - totalPausedTime;
+    }
+
+    function updateCurrentLine() {
+        if (currentIndex < lines.length) {
+            $("#currentLine").text(lines[currentIndex]);
+        } else {
+            $("#currentLine").text("Completed");
+        }
+    }
+
+    function refreshOutput() {
+        const output = $("#output");
+        output.val(srtEntries.join("\n\n"));
+
+        // Scroll to bottom
+        output.scrollTop(output[0].scrollHeight);
+    }
+
+    function startTimerDisplay() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+
+        timerInterval = setInterval(function () {
+            if (!timerStarted) {
+                return;
+            }
+            $("#timer").text(
+                formatSrtTime(getCurrentElapsed())
+            );
+        }, 50);
+    }
+
+    $("#btnStart").on("click", function () {
+        lines = $("#subtitleText")
+            .val()
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
+        if (!lines.length) {
+            alert("Please enter at least one subtitle line.");
+            return;
+        }
+
+        currentIndex = 0;
+        waitingForEnd = false;
+        subtitleStart = null;
+        srtEntries = [];
+        startTime = Date.now();
+        totalPausedTime = 0;
+        pauseStartedAt = 0;
+        timerStarted = true;
+        isPaused = false;
+
+        updateCurrentLine();
+        refreshOutput();
+        startTimerDisplay();
+
+        $("#btnRecord")
+            .prop("disabled", false)
+            .text("Set Start Time");
+
+        $("#btnPause")
+            .prop("disabled", false)
+            .text("Pause");
+    });
+
+    $("#btnRecord").on("click", function () {
+        if (isPaused) {
+            return;
+        }
+        if (currentIndex >= lines.length) {
+            alert("All subtitles completed.");
+            return;
+        }
+
+        let now = getCurrentElapsed();
+
+        if (!waitingForEnd) {
+            subtitleStart = now;
+            waitingForEnd = true;
+            $(this).text("Set End Time");
+        } else {
+            let subtitleEnd = now;
+            let block =
+                `${currentIndex + 1}\n${formatSrtTime(subtitleStart)} --> ${formatSrtTime(subtitleEnd)}\n${lines[currentIndex]}`;
+
+            srtEntries.push(block);
+            refreshOutput();
+
+            currentIndex++;
+            waitingForEnd = false;
+            subtitleStart = null;
+            updateCurrentLine();
+
+            if (currentIndex >= lines.length) {
+                $(this)
+                    .prop("disabled", true)
+                    .text("Completed");
+                alert("Subtitle generation completed.");
+
+            } else {
+                $(this).text("Set Start Time");
+            }
+        }
+    });
+
+    $("#btnPause").on("click", function () {
+        if (!timerStarted) {
+            return;
+        }
+
+        if (!isPaused) {
+            isPaused = true;
+            pauseStartedAt = Date.now();
+            $(this).text("Resume");
+            $("#btnRecord").prop("disabled", true);
+        } else {
+            totalPausedTime += Date.now() - pauseStartedAt;
+            isPaused = false;
+            $(this).text("Pause");
+            $("#btnRecord").prop("disabled", false);
+        }
+    });
+
+    $("#btnReset").on("click", function () {
+        timerStarted = false;
+        isPaused = false;
+        clearInterval(timerInterval);
+
+        lines = [];
+        currentIndex = 0;
+        startTime = null;
+        pauseStartedAt = 0;
+        totalPausedTime = 0;
+        waitingForEnd = false;
+        subtitleStart = null;
+        srtEntries = [];
+
+        $("#timer").text("00:00:00,000");
+        $("#currentLine").text("Not started");
+        $("#output").val("");
+        $("#btnRecord")
+            .prop("disabled", true)
+            .text("Set Start Time");
+        $("#btnPause")
+            .prop("disabled", true)
+            .text("Pause");
+    });
+
+
+</script>
