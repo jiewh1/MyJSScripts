@@ -7,7 +7,6 @@ Using html and jquery, make a subtitle generator to convert lines of text into s
 <img width="1282" height="919" alt="image" src="https://github.com/user-attachments/assets/bbd48d5d-d264-45c2-83fb-df4683eb6c89" />
 
 Sample output:
-Output:
 1
 00:00:01,012 --> 00:00:01,546
 Test line 1
