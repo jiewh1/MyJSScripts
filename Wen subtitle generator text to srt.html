@@ -62,11 +62,8 @@
 </head>
 
 <body>
-
     <h2>SRT Subtitle Generator</h2>
-
     <p>Enter one subtitle per line:</p>
-
     <textarea id="subtitleText" placeholder="Hello everyone.
 Welcome to the training.
 Let's get started."></textarea>
@@ -77,21 +74,33 @@ Let's get started."></textarea>
         <button id="btnPause" disabled>Pause</button>
         <button id="btnReset">Reset</button>
     </div>
-
     <div id="timer">00:00:00,000</div>
-
     <div class="status">
         Current Subtitle:
     </div>
-
     <div id="currentLine">
         Not started
     </div>
-
     <h3>SRT Output</h3>
+    <div style="margin-bottom:10px;">
+        <input
+            type="number"
+            id="shiftSeconds"
+            value="1"
+            min="0"
+            step="0.1"
+            style="width:100px;"
+        />
+        <span>seconds</span>
+        <button id="btnShiftBackward">
+            Shift - Seconds
+        </button>
 
+        <button id="btnShiftForward">
+            Shift + Seconds
+        </button>
+    </div>
     <textarea id="output" readonly></textarea>
-
 </body>
 </html>
 
@@ -112,6 +121,41 @@ Let's get started."></textarea>
     let subtitleStart = null;
 
     let srtEntries = [];
+
+    function parseSrtTime(timeString) {
+        const match = timeString.match(
+            /(\d{2}):(\d{2}):(\d{2}),(\d{3})/
+        );
+        if (!match) return 0;
+        return (
+            parseInt(match[1]) * 3600000 +
+            parseInt(match[2]) * 60000 +
+            parseInt(match[3]) * 1000 +
+            parseInt(match[4])
+        );
+    }
+
+    function shiftSrt(msOffset) {
+        const content = $("#output").val();
+        const updated = content.replace(
+            /(\d{2}:\d{2}:\d{2},\d{3})\s-->\s(\d{2}:\d{2}:\d{2},\d{3})/g,
+            function (_, start, end) {
+
+                let startMs = parseSrtTime(start) + msOffset;
+                let endMs = parseSrtTime(end) + msOffset;
+
+                startMs = Math.max(0, startMs);
+                endMs = Math.max(0, endMs);
+
+                return (
+                    formatSrtTime(startMs) +
+                    " --> " +
+                    formatSrtTime(endMs)
+                );
+            }
+        );
+        $("#output").val(updated);
+    }
 
     function formatSrtTime(ms) {
         let hours = Math.floor(ms / 3600000);
@@ -288,5 +332,15 @@ Let's get started."></textarea>
             .text("Pause");
     });
 
+    $("#btnShiftForward").on("click", function () {
+        const seconds =
+            parseFloat($("#shiftSeconds").val()) || 0;
+        shiftSrt(seconds * 1000);
+    });
 
+    $("#btnShiftBackward").on("click", function () {
+        const seconds =
+            parseFloat($("#shiftSeconds").val()) || 0;
+        shiftSrt(-seconds * 1000);
+    });
 </script>
