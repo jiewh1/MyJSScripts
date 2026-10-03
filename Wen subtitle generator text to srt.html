@@ -332,10 +332,7 @@ Let's get started."></textarea>
         const now = getCurrentElapsed();
 
         // Finish current subtitle
-        const block =
-    `${currentIndex + 1}
-    ${formatSrtTime(subtitleStart)} --> ${formatSrtTime(now)}
-    ${lines[currentIndex]}`;
+        const block = `${currentIndex + 1}\n${formatSrtTime(subtitleStart)} --> ${formatSrtTime(now)}\n${lines[currentIndex]}`;
 
         srtEntries.push(block);
 
