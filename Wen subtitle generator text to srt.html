@@ -71,10 +71,17 @@ Let's get started."></textarea>
     <div class="buttons">
         <button id="btnStart">Start Timer</button>
         <button id="btnRecord" disabled>Set Start Time</button>
+	<button id="btnNext" disabled>End + Next Start</button>
         <button id="btnPause" disabled>Pause</button>
         <button id="btnReset">Reset</button>
     </div>
     <div id="timer">00:00:00,000</div>
+    <div id="countdown" style="
+        font-size:48px;
+        font-weight:bold;
+        color:red;
+        margin:10px 0;
+    "></div>
     <div class="status">
         Current Subtitle:
     </div>
@@ -213,8 +220,62 @@ Let's get started."></textarea>
             );
         }, 50);
     }
-
     $("#btnStart").on("click", function () {
+        lines = $("#subtitleText")
+            .val()
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
+        if (!lines.length) {
+            alert("Please enter at least one subtitle line.");
+            return;
+        }
+        currentIndex = 0;
+        waitingForEnd = false;
+        subtitleStart = null;
+        srtEntries = [];
+
+        refreshOutput();
+        updateCurrentLine();
+
+        $("#btnStart").prop("disabled", true);
+        let countdown = 3;
+        $("#countdown").text(countdown);
+
+        const countdownInterval = setInterval(function () {
+            countdown--;
+            if (countdown > 0) {
+                $("#countdown").text(countdown);
+            } else if (countdown === 0) {
+                $("#countdown").text("GO!");
+            } else {
+                clearInterval(countdownInterval);
+                $("#countdown").text("");
+                startTime = Date.now();
+                totalPausedTime = 0;
+                pauseStartedAt = 0;
+
+                timerStarted = true;
+                isPaused = false;
+
+                $("#btnRecord")
+                    .prop("disabled", false)
+                    .text("Set Start Time");
+
+                $("#btnNext")
+                    .prop("disabled", false);
+
+                $("#btnPause")
+                    .prop("disabled", false)
+                    .text("Pause");
+
+                startTimerDisplay();
+                $("#btnStart").prop("disabled", false);
+            }
+        }, 1000);
+    });
+    /*$("#btnStart").on("click", function () {
         lines = $("#subtitleText")
             .val()
             .split(/\r?\n/)
@@ -244,9 +305,69 @@ Let's get started."></textarea>
             .prop("disabled", false)
             .text("Set Start Time");
 
+        $("#btnNext")
+            .prop("disabled", false);
+
         $("#btnPause")
             .prop("disabled", false)
             .text("Pause");
+    });*/
+    $("#btnNext").on("click", function () {
+
+        if (isPaused) {
+            return;
+        }
+
+        if (currentIndex >= lines.length) {
+            return;
+        }
+
+        if (!waitingForEnd) {
+            alert(
+                "You must set a start time first."
+            );
+            return;
+        }
+
+        const now = getCurrentElapsed();
+
+        // Finish current subtitle
+        const block =
+    `${currentIndex + 1}
+    ${formatSrtTime(subtitleStart)} --> ${formatSrtTime(now)}
+    ${lines[currentIndex]}`;
+
+        srtEntries.push(block);
+
+        refreshOutput();
+
+        currentIndex++;
+
+        // Finished last subtitle
+        if (currentIndex >= lines.length) {
+
+            updateCurrentLine();
+
+            $("#btnRecord")
+                .prop("disabled", true)
+                .text("Completed");
+
+            $("#btnNext")
+                .prop("disabled", true);
+
+            alert("Subtitle generation completed.");
+
+            return;
+        }
+
+        // Start next subtitle immediately
+        subtitleStart = now;
+        waitingForEnd = true;
+
+        updateCurrentLine();
+
+        $("#btnRecord")
+            .text("Set End Time");
     });
 
     $("#btnRecord").on("click", function () {
